@@ -1,0 +1,12 @@
+# Ignore virtual environments
+venv/
+
+# Ignore system-specific files
+.DS_Store
+
+# Allow these files to be tracked
+!requirements.txt
+!Procfile
+!runtime.txt.DS_Store
+*.xlsx
+*.png
