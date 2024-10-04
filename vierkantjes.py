@@ -5,13 +5,10 @@ import matplotlib
 matplotlib.use('Agg')  # Use 'Agg' for non-GUI backend
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-
 import openpyxl
+import numpy as np
+
 print(f"Using openpyxl version: {openpyxl.__version__}")
-
-
-# Set matplotlib to non-interactive backend
-matplotlib.use('Agg')
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads/'
@@ -31,18 +28,20 @@ colors = {
 MODE_SPACING = 0.005
 
 def create_proportional_plot(file_path, output_path):
-    df = pd.read_excel(file_path, engine='openpyxl')  # Specify openpyxl as the engine
+    df = pd.read_excel(file_path, engine='openpyxl')
 
+    # Extract the data for distance groups and modal split
     distance_groups = df[['Afstandsklasse', 'Totaal']].dropna()
     modal_split = df[['Te voet', 'Fiets', 'OV', 'Auto (+overig)']]
 
+    # Normalize the total proportions of distance groups
     total_proportions = distance_groups['Totaal'].sum()
     distance_groups['Totaal'] = distance_groups['Totaal'] / total_proportions
 
-    fig, ax = plt.subplots(figsize=(8, 8))
-    x_offset = 0
-    spacing = 0.005
+    # Create a square plot, smaller plot but add more space around it
+    fig, ax = plt.subplots(figsize=(9, 9))
 
+    y_offset = 0  # Initialize y offset for distance groups
     group_centers = []
 
     for idx, row in distance_groups.iterrows():
@@ -52,37 +51,43 @@ def create_proportional_plot(file_path, output_path):
         if pd.isna(distance_label):
             continue
 
-        group_width = total_proportion - spacing
+        group_height = total_proportion - MODE_SPACING
         modal_split_proportions = modal_split.iloc[idx]
         total_split = modal_split_proportions.sum()
         modal_split_proportions = modal_split_proportions / total_split
 
-        group_centers.append(x_offset + group_width / 2)
-        y_offset = 0
+        group_centers.append(y_offset + group_height / 2)
+
+        x_offset = 0
         for mode, proportion in modal_split_proportions.items():
-            height = proportion - MODE_SPACING
-            ax.add_patch(plt.Rectangle((x_offset, y_offset), group_width, height, color=colors[mode], edgecolor='none'))
-            y_offset += proportion
+            width = proportion - MODE_SPACING
+            ax.add_patch(plt.Rectangle((x_offset, y_offset), width, group_height, 
+                                       color=colors[mode], edgecolor='none'))
+            x_offset += proportion
 
-        x_offset += total_proportion
+        y_offset += total_proportion
 
-    ax.set_xlim([0, 1])
-    ax.set_ylim([0, 1])
-    ax.set_aspect('equal')
-    ax.set_xticks(group_centers)
-    ax.set_xticklabels(distance_groups['Afstandsklasse'], fontsize=12, ha='center')
-    ax.set_yticks([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
-    ax.set_yticklabels([f'{int(i*100)}%' for i in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]], fontsize=12)
+    ax.set_yticks(group_centers)
+    ax.set_yticklabels(distance_groups['Afstandsklasse'], fontsize=12, ha='right')
 
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
-    ax.grid(which='major', axis='x', linestyle=':', linewidth=1, color='gray')
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
-    ax.grid(which='major', axis='y', linestyle=':', linewidth=1, color='gray')
+    ax.set_xticks([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.set_xticklabels([f'{int(i*100)}%' for i in [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]], fontsize=12)
 
+    # Set limits to provide more space for labels
+    ax.set_ylim(0, 1)  # Adjust as needed based on total proportions
+
+    # Adjust subplot parameters for better spacing
+    plt.subplots_adjust(left=0.3, right=0.85, top=0.9, bottom=0.2)
+
+    # Ensure square aspect ratio
+    ax.set_aspect('equal', adjustable='box')
+
+    # Add legend for transport modes
     handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in colors.values()]
     labels = list(colors.keys())
     ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.05, 1), frameon=False)
 
+    # Save the plot to the output path
     plt.savefig(output_path, bbox_inches='tight')
     plt.close()
 
